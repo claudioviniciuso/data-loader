@@ -32,6 +32,12 @@ class TestElasticHandler(unittest.TestCase):
 
         elastic_response = elastic_handler.send_to_elasticsearch(mock_df)
 
+        errors = [x.get('errors') for x in elastic_response if x.get('errors') is True]
+        items = [x.get('items') for x in elastic_response if x.get('items')]
+
+        self.assertEqual(len(errors), 0, "Não há erros")
+        self.assertGreater(len(items), 0, "Há mais que um elemento na lista.")
+
 
 if __name__ == '__main__':
     unittest.main()

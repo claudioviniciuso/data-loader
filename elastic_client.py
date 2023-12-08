@@ -25,6 +25,24 @@ class ElasticHandler:
         return current_index_config
 
     def send_to_elasticsearch(self, df_raw):
+        """
+            Sends records from a DataFrame to Elasticsearch in batches.
+
+            Args:
+                df_raw (pandas.DataFrame): The columns will be compared to fields defined in appsettings.json.
+
+            Returns:
+                list: A list of dictionaries representing the results of each batch sent to Elasticsearch.
+                      Each dictionary contains information about the batch, such as the batch number ('bulk_number'),
+                       any errors occurred ('errors'), and the execution time ('took').
+
+            Raises:
+                Exception: If there are issues with the 'appsettings.json' file, such as missing or incorrect fields.
+
+            Note:
+                The function utilizes configurations specified in the 'appsettings.json' file to map DataFrame fields
+                before sending the data to Elasticsearch.
+            """
 
         try:
             fields_mapping = self.config['FieldsMapping']
@@ -33,7 +51,6 @@ class ElasticHandler:
             raise Exception("appsettings.json file is corrupted")
 
         df = df_raw[fields_to_keep]
-
         df = df.fillna(np.nan).replace([np.nan], [None])
         df = df.replace(np.NaN, pandas.NA).where(df.notnull(), None)
 
@@ -65,6 +82,11 @@ class ElasticHandler:
             bulk_pack.append(bulk_unit)
 
         # Send bulk data to Elasticsearch
-        for bulk in bulk_pack:
+        result = []
+        for bi, bulk in enumerate(bulk_pack):
             bulk_data = "\n".join(bulk) + "\n"
-            self.client.bulk(body=bulk_data)
+            elastic_response = self.client.bulk(body=bulk_data)
+            result.append({'bulk_number': bi, 'errors': elastic_response.body.get('errors'),
+                           "items": elastic_response.get('took')})
+        return result
+

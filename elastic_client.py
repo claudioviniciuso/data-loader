@@ -1,13 +1,18 @@
+import multiprocessing
+import os
+import numpy as np
+import pandas
 from elasticsearch import Elasticsearch
-
 import json
 
 
 class ElasticHandler:
     def __init__(self, index_name):
         self.config = self._set_config(index_name)
-        self.client = Elasticsearch(config, api_key=api_key)
+        self.client = Elasticsearch(self.config['Url'], api_key=os.environ.get(self.config['ApiKey']))
         self.index_name = index_name
+        self.cpu_count = multiprocessing.cpu_count() - 2
+        self.chunck_size = 100
 
     @staticmethod
     def _set_config(index_name):
@@ -19,30 +24,47 @@ class ElasticHandler:
             raise Exception("Índice inválido. Verificar appsettings.json")
         return current_index_config
 
-    def send_to_elasticsearch(self, df, chunck_size=100):
+    def send_to_elasticsearch(self, df_raw):
 
-        # If fields are pre-determined:
-        fields_to_keep = df.columns.values
-        if self.config:
-            fields_mapping = self.config['ElasticsearchConfigs'][self.index_name]['FieldsMapping']
+        try:
+            fields_mapping = self.config['FieldsMapping']
             fields_to_keep = [mapping['FieldName'] for mapping in fields_mapping.values()]
+        except (KeyError, ValueError):
+            raise Exception("appsettings.json file is corrupted")
 
-        df_filtered = df[fields_to_keep]
+        df = df_raw[fields_to_keep]
 
-        # Convert DataFrame to JSON
-        records = df_filtered.to_dict(orient='records')
+        df = df.fillna(np.nan).replace([np.nan], [None])
+        df = df.replace(np.NaN, pandas.NA).where(df.notnull(), None)
+
+        if df is None:
+            print('Dataframe is None')
+            return
+
+        if df.empty:
+            print('Dataframe is Empty')
+            return
 
         # Bulk index the records to Elasticsearch
-        bulk_data = []
-        for record in records:
+        counter = 0
+        bulk_pack = []
+        bulk_unit = []
+        for record in df.to_dict(orient='records'):
             data = {
                 "index": {
                     "_index": self.index_name,
                 }
             }
-            bulk_data.append(json.dumps(data))
-            bulk_data.append(json.dumps(record))
+            counter += 1
+            if counter > self.chunck_size:
+                bulk_pack.append(bulk_unit)
+                counter, bulk_unit = 0, []
+            bulk_unit.append(json.dumps(data))
+            bulk_unit.append(json.dumps(record))
+        if len(bulk_unit) > 0:
+            bulk_pack.append(bulk_unit)
 
         # Send bulk data to Elasticsearch
-        bulk_data = "\n".join(bulk_data) + "\n"
-        self.client.bulk(body=bulk_data)
+        for bulk in bulk_pack:
+            bulk_data = "\n".join(bulk) + "\n"
+            self.client.bulk(body=bulk_data)

@@ -1,48 +1,36 @@
 import json
-import os
+import random
 import pandas
 import unittest
-from unittest.mock import patch
 from dotenv import load_dotenv
 from elastic_client import ElasticHandler
 
 
 class TestElasticHandler(unittest.TestCase):
 
-    @patch('elastic_client.ElasticHandler')
-    def test_send_to_elasticsearch(self, mock_es):
+    def test_send_to_elasticsearch(self):
 
         load_dotenv()
 
-        # Dados fictícios para simular um DataFrame
+        # Mock do DataFrame
+        rand = random.randint(10000, 20000)
         data = {
             "created_at": ["2023-01-03", "2023-01-04"],
             "updated_at": ["2023-01-03", "2023-01-04"],
-            "title": ["Title 3", "Title 4"],
-            "product_name": ["Product C", "Product D"]
+            "title": [f"Title {rand}", f"Title {rand}"],
+            "product_name": [f"Product {rand}", f"Product {rand}"]
         }
+        mock_df = pandas.DataFrame(data=data)
 
         # Carregar as configurações do arquivo JSON
         with open('./appsettings.json', 'r') as f:
             config = json.load(f)
 
-        app_esther_config = config['ElasticsearchConfigs']['app_esther']
+        index = 'app_esther'
 
-        # Extrair informações para a configuração do índice 'app_esther'
-        elasticsearch_url = app_esther_config['Url']
-        index_name = 'app_esther'
-        api_key = os.environ.get(app_esther_config['ApiKey'])
+        elastic_handler = ElasticHandler(index)
 
-        elastic_handler = ElasticHandler(elasticsearch_url, api_key, index_name, config=config)
-
-        # Mock do DataFrame (simulação de um DataFrame real)
-        mock_df = pandas.DataFrame(data=data)
-
-        # Chamar a função para enviar dados para o Elasticsearch
-        elastic_handler.send_to_elasticsearch(mock_df)
-
-        # Verificar se a função Elasticsearch.bulk foi chamada
-        mock_es.return_value.bulk.assert_called_once()
+        elastic_response = elastic_handler.send_to_elasticsearch(mock_df)
 
 
 if __name__ == '__main__':

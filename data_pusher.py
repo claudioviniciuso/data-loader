@@ -63,7 +63,7 @@ class PostgreSQLLoader:
         return
 
 
-class LoaderData:
+class DataLoader:
 
     loaders = {
         'ElasticSearch': ElasticSearchLoader,
@@ -111,7 +111,7 @@ if __name__ == "__main__":
         'ElasticSearch': {
             'index_name': 'app_esther',
             'Url': 'https://ea4ccfddc4a64600a9e4b6f93d810ac8.us-central1.gcp.cloud.es.io:443',
-            'ApiKey': '<PREENCHER>',
+            'ApiKey': '<digite aqui sua chave>',
         },
         'PostgreSQLLoader': {
             'db': 'gooru_tests',
@@ -123,5 +123,5 @@ if __name__ == "__main__":
 
     # Obtendo um loader específico (ElasticSearchLoader ou PostgreSQLLoader)
     ld = 'ElasticSearch'
-    loader = LoaderData(ld, extra_full.get(ld))
+    loader = DataLoader(ld, extra_full.get(ld))
     loader.save(mock_df)

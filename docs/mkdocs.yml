@@ -1,3 +1,0 @@
-site_name: Elastic data loader
-plugins:
-  - mkdocstrings

@@ -53,3 +53,53 @@ paralelizados utilizando-se a função `parallel_bulk` da api do ElasticSearch.
 
 A metodologia é similar a anterior, porém os parâmetros são diferentes.
 É importante passar detalhes do banco, como host, user, password, etc.
+
+O carregamento também é feito em _chunks_ que por default vale 500, mas 
+pode ser alterado no dicionário `extra`. Uma funcionalidade bastante importante
+é a elasticidade do banco relacional - se o dataframe de input vier com colunas
+adicionais, as mesmas são criadas.
+
+## Testes
+
+Para testar o código, você pode utilizar o seguinte script:
+
+```
+import random
+from dateutil import parser
+# Mock do DataFrame
+rand = random.randint(10000, 20000)
+data = {
+    "created_at": [parser.parse("2023-01-03"), parser.parse("2023-01-04")],
+    "updated_at": [parser.parse("2023-01-03"), parser.parse("2023-01-04")],
+    "title": [f"Título1 dia 9 de dezembro - {rand}", f"Título2 dia 9 de dezembro - {rand}"],
+    "product_name": [f"Product {rand}", f"Product {rand}"]
+}
+mock_df = pandas.DataFrame(data=data)
+
+extra_full = {
+    'ElasticSearch': {
+        'index_name': 'app_esther',
+        'Url': 'https://ea4ccfddc4a64600a9e4b6f93d810ac8.us-central1.gcp.cloud.es.io:443',
+        'ApiKey': '<insira sua chave aqui>',
+    },
+    'PostgreSQL': {
+        'pg_dbname': 'gooru_tests',
+        'pg_password': '<insira sua senha do postgres aqui>',
+        'chunk_size': 1
+    }
+}
+
+# Obtendo um loader específico (PostgreSQLoader)
+ld = 'PostgreSQL'
+loader = DataLoader(ld, extra_full.get(ld))
+loader.save(mock_df, table_name='pusher_table')
+
+# Obtendo um loader específico (ElasticSearchLoader)
+ld = 'ElasticSearch'
+loader = DataLoader(ld, extra_full.get(ld))
+loader.save(mock_df)
+```
+
+Teste adicionar colunas no dataframe e também alterar os tipos
+para avaliar o comportamento do script.
+

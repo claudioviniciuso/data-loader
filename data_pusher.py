@@ -4,6 +4,7 @@ import json
 import multiprocessing
 import numpy
 import pandas
+from sqlalchemy import text
 from sqlalchemy import create_engine
 from elasticsearch import Elasticsearch
 from elasticsearch.helpers import parallel_bulk
@@ -67,10 +68,6 @@ class PostgreSQLoader:
         self.engine = create_engine(f'postgresql://{pg_user}:{pg_password}@{pg_host}:{pg_port}/{pg_dbname}')
 
     def save(self, df: pandas.DataFrame, table_name=None):
-        for i in range(0, len(df), self.chunk_size):
-            chunk = df[i:i + self.chunk_size]
-            with self.engine.connect() as conn:
-                chunk.to_sql(table_name, conn, if_exists='append', index=False)
 
         # Verificar se existem colunas adicionais no DataFrame em relação à tabela no banco de dados
         with self.engine.connect() as conn:
@@ -80,21 +77,18 @@ class PostgreSQLoader:
         if not colunas_novas.empty:
             with self.engine.connect() as conn:
                 for col in colunas_novas:
-                    conn.execute(f'ALTER TABLE {table_name} ADD COLUMN "{col}" TEXT')
+                    query = text(f'ALTER TABLE {table_name} ADD COLUMN "{col}" TEXT')
+                    conn.execute(query)
+                    conn.commit()
 
-        # Preencher campos ausentes com valores nulos na tabela do PostgreSQL (se necessário)
-        # Suponha que 'coluna3' seja uma coluna ausente que precisa ser preenchida com valores nulos
-        # Verifique se a coluna existe na tabela antes de preencher
-        if 'coluna3' not in tabela_colunas:
+        i = 0
+        for i in range(0, len(df), self.chunk_size):
+            chunk = df[i:i + self.chunk_size]
             with self.engine.connect() as conn:
-                conn.execute(f'ALTER TABLE {table_name} ADD COLUMN "coluna3" TEXT')
+                chunk.to_sql(table_name, conn, if_exists='append', index=False)
 
-        # Selecione as colunas que não estão presentes no DataFrame e preencha com valores nulos
-        colunas_faltantes = tabela_colunas.difference(df.columns)
-        if not colunas_faltantes.empty:
-            with self.engine.connect() as conn:
-                for col in colunas_faltantes:
-                    conn.execute(f'UPDATE {table} SET "{col}" = NULL')
+        # Retorna o número de chunks enviado
+        return i + 1
 
 
 class DataLoader:
@@ -135,10 +129,8 @@ if __name__ == "__main__":
         "created_at": [parser.parse("2023-01-03"), parser.parse("2023-01-04")],
         "updated_at": [parser.parse("2023-01-03"), parser.parse("2023-01-04")],
         "title": [f"Título1 dia 9 de dezembro - {rand}", f"Título2 dia 9 de dezembro - {rand}"],
-        "product_name": [f"Product {rand}", f"Product {rand}"],
-        "quantity": random.randint(0, 100),
-        "valueA": random.uniform(1000, 2000),
-        "valueB": 1
+        "product_name": [f"Product {rand}", f"Product {rand}"]
+
     }
     mock_df = pandas.DataFrame(data=data)
 
@@ -150,7 +142,7 @@ if __name__ == "__main__":
         },
         'PostgreSQL': {
             'pg_dbname': 'gooru_tests',
-            'pg_password': '<insira sua senha aqui>',
+            'pg_password': '<insira sua senha do postgres aqui>',
             'chunk_size': 1
         }
     }

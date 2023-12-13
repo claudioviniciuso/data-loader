@@ -1,0 +1,13 @@
+*.pyc
+__pycache
+.DS_Store
+app/.env
+env/
+**/.idea/**
+**/__pycache__/**
+unittests/*
+external/*
+.pytest_cache/**
+.env
+
+lab.py

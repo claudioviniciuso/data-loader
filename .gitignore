@@ -10,3 +10,4 @@ external/*
 .pytest_cache/**
 .env
 
+lab.py
